@@ -6,6 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
+atomic = "0.5.0"
 
 [build-dependencies]
 rustc_version = "0.3.0"
