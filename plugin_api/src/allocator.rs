@@ -21,30 +21,32 @@ pub fn get_allocator() -> HostAllocatorPtr {
 pub mod host_alloctor {
     use super::*;
     use std::alloc::{GlobalAlloc, Layout};
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicPtr, Ordering};
 
     pub unsafe fn set_allocator(allocator: HostAllocatorPtr) {
-        HOST_ALLOCATOR.alloc_fn.store(allocator.alloc_fn as usize, Ordering::SeqCst);
-        HOST_ALLOCATOR.dealloc_fn.store(allocator.dealloc_fn as usize, Ordering::SeqCst);
+        HOST_ALLOCATOR.alloc_fn
+            .store(allocator.alloc_fn as *mut _, Ordering::SeqCst);
+        HOST_ALLOCATOR.dealloc_fn
+            .store(allocator.dealloc_fn as *mut _, Ordering::SeqCst);
     }
 
     struct HostAllocator {
-        alloc_fn: AtomicUsize,
-        dealloc_fn: AtomicUsize
+        alloc_fn: AtomicPtr<AllocFn>,
+        dealloc_fn: AtomicPtr<DeallocFn>,
     }
 
     #[global_allocator]
     static HOST_ALLOCATOR: HostAllocator = HostAllocator {
-        alloc_fn: AtomicUsize::new(0),
-        dealloc_fn: AtomicUsize::new(0),
+        alloc_fn: AtomicPtr::new(std::ptr::null_mut()),
+        dealloc_fn: AtomicPtr::new(std::ptr::null_mut()),
     };
 
     unsafe impl GlobalAlloc for HostAllocator {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            (std::mem::transmute::<_, AllocFn>(self.alloc_fn.load(Ordering::Relaxed)))(layout)
+            (*self.alloc_fn.load(Ordering::Relaxed))(layout)
         }
         unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-            (std::mem::transmute::<_, DeallocFn>(self.dealloc_fn.load(Ordering::Relaxed)))(ptr, layout)
+            (*self.dealloc_fn.load(Ordering::Relaxed))(ptr, layout)
         }
     }
 }
